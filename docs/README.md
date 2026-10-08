@@ -1,5 +1,3 @@
 # GitHub Action - Nix Reclaim
 
-GitHub Action to Reclaim Space for Nix
-
-Work in progress.
+See the main [README.md](../README.md) for full documentation, benchmarks, and usage instructions.
