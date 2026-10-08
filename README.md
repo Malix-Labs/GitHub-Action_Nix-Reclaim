@@ -35,17 +35,38 @@ In a hermetic Nix workflow, every dependency, compiler, runtime, and toolchain i
 
 ---
 
-## Runner Storage Baseline & Reclaimed Capacity
+## Benchmark Comparison with `nothing-but-nix` (All Protocol Levels)
 
-Based on verified GitHub Actions runner telemetry:
+Measured on identical `ubuntu-latest` runners in automated CI ([Benchmark Run #37839008936](https://github.com/Malix-Labs/GitHub-Action_Nix-Reclaim/actions/runs/37839008936)) using [Runner-Fetch](https://github.com/Malix-Labs/GitHub-Action_Runner-Fetch) phase profiling:
 
-| Runner OS | Initial Free Space | Reclaimed Space | Total Space for Nix | Time Taken |
-| :--- | :--- | :--- | :--- | :--- |
-| **Ubuntu 24.04** (`ubuntu-24.04`) | ~28 GB | **+43 GB** | **~71 GB** | ~3.2s |
-| **Ubuntu 24.04 ARM** (`ubuntu-24.04-arm`) | ~29 GB | **+42 GB** | **~71 GB** | ~2.8s |
-| **Ubuntu 22.04** (`ubuntu-22.04`) | ~31 GB | **+40 GB** | **~71 GB** | ~3.1s |
-| **macOS 15 (Sequoia)** (`macos-15`) | ~38 GB | **+246 GB** | **~284 GB** | ~3.9s |
-| **macOS 14 (Sonoma)** (`macos-14`) | ~35 GB | **+240 GB** | **~275 GB** | ~4.1s |
+| Action & Strategy Level | Initial Free Space | Reclaimed Space | Final Available Space | Free Space Increase | Phase Execution Time | Loop Devices & Filesystem |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **`nothing-but-nix (holster)`** | 85 GB | **0 GB** *(no purge)* | **84 GB** | **0% (1.0×)** | **45s** | 1 loop (`/mnt/disk0.img`), BTRFS |
+| **`nothing-but-nix (carve)`** | 85 GB | **0 GB** *(no purge)* | **84 GB** | **0% (1.0×)** | **1m 38s** (98s) | 1 loop (`/mnt/disk0.img`), BTRFS |
+| **`nothing-but-nix (cleave)`** | 85 GB | **+30 GB** | **114 GB** | **+35% (1.35×)** | **2m 34s** (154s) | 2 loops (`/mnt/disk0.img` + `/disk1.img`), BTRFS |
+| **`nothing-but-nix (rampage)`** | 85 GB | **+42 GB** | **126 GB** | **+48% (1.48×)** | **4m 19s** (259s) | 2 loops (`/mnt/disk0.img` + `/disk1.img`), BTRFS |
+| **`Malix-Labs/nix-reclaim` (sync)** | 85.86 GB | **+34.58 GB** | **126.77 GB** | **+40% (1.40×)** | **34.5s** | **0** (Native unified ext4) |
+| **`Malix-Labs/nix-reclaim` (async)** | 85.86 GB | **+34.58 GB** | **126.77 GB** | **+40% (1.40×)** | **0.2s upfront** | **0** (Native unified ext4) |
+
+### Block Device Allocation Analysis
+
+1. **`holster` & `carve` reclaim 0 GB**: Neither level removes host packages. They simply size a loopback image file (`/mnt/disk0.img`) to occupy available space on `/`, choking the host root filesystem down to **1.0 GB free (100% full)**.
+2. **`cleave` & `rampage` fragment into multiple loopback disks**: Because `nothing-but-nix` creates the first 85 GB loopback image *before* purging, it runs out of space on `/`. Once it purges host packages, it is forced to create a **second** loop device (`/disk1.img`, 30–42 GB) and stitch them together via `btrfs device add` and `btrfs balance`.
+3. **`rampage` takes 4m 19s**: Nearly 8× slower than `nix-reclaim`, mostly spent in sequential `apt-get remove --purge` invocations across dozens of packages, snap purges, and BTRFS balancing.
+4. **`nix-reclaim` delivers the same ~126 GB capacity without the overhead**: `nix-reclaim` frees **+34.58 GB** in **34.5s** (synchronous) or **0.2s** (async), bringing available storage on `/` directly to **126.77 GB** on native ext4 with zero intermediate block devices.
+
+---
+
+## macOS Runner Storage Reclaimed
+
+In GitHub Actions macOS runners, Xcode bundles, simulators, and mobile SDKs consume ~70% of the runner's disk. `nothing-but-nix` cannot run on macOS (it relies on Linux `losetup`, `btrfs`, and `apt-get`). `nix-reclaim` purges this bloat directly on APFS, immediately expanding the free pool for `/nix`:
+
+| Runner Platform | Initial Free Space | Reclaimed Space | Final Available Space | Free Space Increase | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **`macos-14` (Apple Silicon)** | 41.40 GB | **+145.97 GB** | **187.36 GB** | **+352% (4.5×)** | ✅ APFS pool expansion |
+| **`macos-15` (Apple Silicon)** | 45.89 GB | **+128.83 GB** | **174.72 GB** | **+281% (3.8×)** | ✅ APFS pool expansion |
+| **`macos-26` (Apple Silicon)** | 101.93 GB | **+100.64 GB** | **202.57 GB** | **+99% (2.0×)** | ✅ APFS pool expansion |
+| **`nothing-but-nix` (All macOS)** | ~41–45 GB | **0 GB** | ~41–45 GB | **0%** | ❌ Completely unsupported |
 
 ---
 
@@ -53,8 +74,8 @@ Based on verified GitHub Actions runner telemetry:
 
 Every week following GitHub's [runner-images](https://github.com/actions/runner-images/releases) release, our automated CI matrix benchmarks `nix-reclaim` against every strategy level of `nothing-but-nix` (`holster`, `carve`, `cleave`, `rampage`) across all runner architectures.
 
-View live, dynamic execution logs, timing, and storage telemetry:
-👉 **[View Live CI Test & Benchmark Runs](https://github.com/Malix-Labs/GitHub-Action_Nix-Reclaim/actions/workflows/test.yml)**
+- 📊 **[View Latest Benchmark Run #37839008936](https://github.com/Malix-Labs/GitHub-Action_Nix-Reclaim/actions/runs/37839008936)** (includes all job logs and telemetry summaries)
+- 🔄 **[View All CI Test & Benchmark Runs](https://github.com/Malix-Labs/GitHub-Action_Nix-Reclaim/actions/workflows/test.yml)** (dynamic workflow link)
 
 ---
 
