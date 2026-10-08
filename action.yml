@@ -10,11 +10,14 @@ inputs:
   remove-swap:
     description: "Disable and delete Linux swapfile (frees +3-4 GB, with OOM risk on memory-heavy builds)."
     default: "false"
+  dry-run:
+    description: "Perform a dry run without deleting files or modifying permissions."
+    default: "false"
   async:
     description: "Run deletion in background (0s upfront delay) instead of synchronously."
     default: "false"
   nix-permissions:
-    description: "Ensure /nix is created and owned by runner user (chown -R $(id -u):$(id -g) /nix)."
+    description: "Ensure /nix is created and owned by runner user (chown $(id -u):$(id -g) /nix)."
     default: "true"
   summary:
     description: "Generate step summary report via Malix-Labs/GitHub-Action_Runner-Fetch."
@@ -63,6 +66,7 @@ runs:
       run: |
         "${{ github.action_path }}/src/reclaim.sh" \
           --remove-swap "${{ inputs.remove-swap }}" \
+          --dry-run "${{ inputs.dry-run }}" \
           --async "${{ inputs.async }}" \
           --nix-permissions "${{ inputs.nix-permissions }}" \
           --summary "${{ inputs.summary }}"

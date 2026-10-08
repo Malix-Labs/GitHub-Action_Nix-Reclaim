@@ -2,6 +2,7 @@
 set -eu
 
 REMOVE_SWAP="false"
+DRY_RUN="false"
 ASYNC="false"
 NIX_PERMISSIONS="true"
 SUMMARY="true"
@@ -10,6 +11,10 @@ while [ "$#" -gt 0 ]; do
 	case "$1" in
 	--remove-swap)
 		REMOVE_SWAP="${2:-false}"
+		shift 2
+		;;
+	--dry-run)
+		DRY_RUN="${2:-false}"
 		shift 2
 		;;
 	--async)
@@ -33,8 +38,8 @@ done
 _sudo() {
 	if [ "$(id -u)" -eq 0 ]; then
 		"$@"
-	elif command -v sudo >/dev/null 2>&1; then
-		sudo -n "$@" 2>/dev/null || sudo "$@"
+	elif command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+		sudo -n "$@"
 	else
 		"$@"
 	fi
@@ -73,9 +78,12 @@ INITIAL_FREE_BYTES=$(get_free_bytes)
 # Build candidate purge lists based on OS
 CANDIDATES=""
 
-case "$TARGET_OS" in
-Linux*)
-	CANDIDATES="/opt/hostedtoolcache
+if [ -n "${RECLAIM_CANDIDATES_OVERRIDE:-}" ]; then
+	CANDIDATES="$RECLAIM_CANDIDATES_OVERRIDE"
+else
+	case "$TARGET_OS" in
+	Linux*)
+		CANDIDATES="/opt/hostedtoolcache
 /usr/local/lib/android
 /usr/local/share/boost
 /usr/share/dotnet
@@ -89,9 +97,9 @@ Linux*)
 /usr/lib/firefox
 /usr/share/man
 /usr/share/doc"
-	;;
-macOS | Darwin)
-	CANDIDATES="/Library/Developer/CoreSimulator
+		;;
+	macOS | Darwin)
+		CANDIDATES="/Library/Developer/CoreSimulator
 /Users/runner/Library/Android
 /Users/runner/hostedtoolcache
 /opt/homebrew
@@ -99,8 +107,9 @@ macOS | Darwin)
 /usr/local/share/dotnet
 /Users/runner/Library/Caches
 /Library/Caches"
-	;;
-esac
+		;;
+	esac
+fi
 
 # Collect existing paths to purge
 EXISTING=""
@@ -111,21 +120,29 @@ for path in $CANDIDATES; do
 	fi
 done
 
-# On macOS, expand Xcode bundles if present
-case "$TARGET_OS" in
-macOS | Darwin)
-	for xcode in /Applications/Xcode*.app; do
-		if [ -e "$xcode" ]; then
-			EXISTING="${EXISTING}${xcode}
+# On macOS, expand Xcode bundles if present (unless overridden)
+if [ -z "${RECLAIM_CANDIDATES_OVERRIDE:-}" ]; then
+	case "$TARGET_OS" in
+	macOS | Darwin)
+		for xcode in /Applications/Xcode*.app; do
+			if [ -e "$xcode" ]; then
+				EXISTING="${EXISTING}${xcode}
 "
-		fi
-	done
-	;;
-esac
+			fi
+		done
+		;;
+	esac
+fi
 
 # Execute unlinking
 if [ -n "$EXISTING" ]; then
-	if [ "$ASYNC" = "true" ]; then
+	if [ "$DRY_RUN" = "true" ]; then
+		echo "Nix Reclaim [dry-run]: Found purge targets:"
+		echo "$EXISTING" | while IFS= read -r p; do
+			[ -z "$p" ] && continue
+			echo "  - $p"
+		done
+	elif [ "$ASYNC" = "true" ]; then
 		TRASH_DIR=$(mktemp -d /tmp/.reclaim-trash.XXXXXX 2>/dev/null || mktemp -d -t .reclaim-trash)
 		echo "Nix Reclaim: Moving host bloat to staging directory ${TRASH_DIR} for background unlinking..."
 		echo "$EXISTING" | while IFS= read -r p; do
@@ -135,7 +152,7 @@ if [ -n "$EXISTING" ]; then
 		(_sudo rm -rf "$TRASH_DIR" >/dev/null 2>&1 &)
 	else
 		echo "Nix Reclaim: Purging host bloat in parallel across available CPU cores..."
-		echo "$EXISTING" | while IFS= read -r p; do
+		for p in $EXISTING; do
 			[ -z "$p" ] && continue
 			_sudo rm -rf "$p" >/dev/null 2>&1 &
 		done
@@ -148,21 +165,29 @@ if [ "$REMOVE_SWAP" = "true" ]; then
 	case "$TARGET_OS" in
 	Linux*)
 		echo "::warning::Disabling swap removes the emergency RAM buffer. Memory-heavy Nix builds may risk OOM."
-		_sudo swapoff -a 2>/dev/null || true
-		_sudo rm -f /swapfile /mnt/swapfile 2>/dev/null || true
+		if [ "$DRY_RUN" != "true" ]; then
+			_sudo swapoff -a 2>/dev/null || true
+			_sudo rm -f /swapfile /mnt/swapfile 2>/dev/null || true
+		else
+			echo "Nix Reclaim [dry-run]: Would run swapoff -a and remove /swapfile /mnt/swapfile"
+		fi
 		;;
 	esac
 fi
 
 # Ensure /nix directory setup and permissions
 if [ "$NIX_PERMISSIONS" = "true" ]; then
-	_sudo mkdir -p /nix
-	_sudo chown -R "$(id -u):$(id -g)" /nix 2>/dev/null || true
-	_sudo chmod 0755 /nix 2>/dev/null || true
-	_sudo mkdir -p /nix/tmp
-	_sudo chmod 1777 /nix/tmp 2>/dev/null || true
-	if [ -n "${GITHUB_ENV:-}" ]; then
-		echo "TMPDIR=/nix/tmp" >>"$GITHUB_ENV"
+	if [ "$DRY_RUN" != "true" ]; then
+		_sudo mkdir -p /nix 2>/dev/null || true
+		_sudo chown "$(id -u):$(id -g)" /nix 2>/dev/null || true
+		_sudo chmod 0755 /nix 2>/dev/null || true
+		_sudo mkdir -p /nix/tmp 2>/dev/null || true
+		_sudo chmod 1777 /nix/tmp 2>/dev/null || true
+		if [ -n "${GITHUB_ENV:-}" ]; then
+			echo "TMPDIR=/nix/tmp" >>"$GITHUB_ENV"
+		fi
+	else
+		echo "Nix Reclaim [dry-run]: Would initialize /nix (0755) and /nix/tmp (1777)"
 	fi
 fi
 

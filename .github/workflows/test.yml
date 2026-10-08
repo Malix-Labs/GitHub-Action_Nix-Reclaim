@@ -1,0 +1,106 @@
+name: Test Nix Reclaim
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 4' # after every weekly runners-images release (https://github.com/actions/runner-images/releases)
+
+jobs:
+  test-reclaim:
+    name: "Reclaim: ${{ matrix.os }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        os: # from: https://docs.github.com/en/actions/reference/runners
+          - ubuntu-latest
+          - ubuntu-26.04
+          - ubuntu-26.04-arm
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+          - ubuntu-22.04
+          - ubuntu-22.04-arm
+          - ubuntu-slim
+          - macos-latest
+          - macos-26
+          - macos-26-intel
+          - macos-15
+          - macos-15-intel
+          - macos-14
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run Nix Reclaim
+        id: reclaim
+        uses: ./
+        with:
+          summary: true
+          monitor-disk: true
+          monitor-disk-io: true
+      - name: Validate Reclaim Outputs
+        shell: bash
+        run: |
+          echo "Initial free: ${{ steps.reclaim.outputs.initial-free-bytes }} bytes"
+          echo "Final free: ${{ steps.reclaim.outputs.final-free-bytes }} bytes"
+          echo "Reclaimed: ${{ steps.reclaim.outputs.reclaimed-bytes }} bytes"
+          [ "${{ steps.reclaim.outputs.final-free-bytes }}" -gt 0 ]
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+      - name: Verify Nix Environment
+        shell: bash
+        run: |
+          nix --version
+          nix flake show || true
+
+  benchmark-nix-reclaim:
+    name: "Benchmark: nix-reclaim (async=${{ matrix.async }})"
+    strategy:
+      fail-fast: false
+      matrix:
+        async:
+          - false
+          - true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run Nix Reclaim
+        id: reclaim
+        uses: ./
+        with:
+          async: ${{ matrix.async }}
+          summary: true
+          monitor-disk: true
+          monitor-disk-io: true
+
+  benchmark-nothing-but-nix:
+    name: "Benchmark: nothing-but-nix (${{ matrix.strategy }})"
+    strategy:
+      fail-fast: false
+      matrix:
+        strategy:
+          - holster
+          - carve
+          - cleave
+          - rampage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Start Benchmark Telemetry
+        uses: Malix-Labs/GitHub-Action_Runner-Fetch@v1.1.0
+        with:
+          phase-start: "nothing-but-nix (${{ matrix.strategy }})"
+          scope-level: "1"
+          monitor-disk: true
+          monitor-disk-io: true
+      - name: Run nothing-but-nix (${{ matrix.strategy }})
+        uses: wimpysworld/nothing-but-nix@main
+        with:
+          strategy: ${{ matrix.strategy }}
+      - name: End Benchmark Telemetry & Summary
+        uses: Malix-Labs/GitHub-Action_Runner-Fetch@v1.1.0
+        with:
+          phase-end: "nothing-but-nix (${{ matrix.strategy }})"
+          scope-level: "1"
