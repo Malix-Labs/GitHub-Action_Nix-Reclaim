@@ -1,0 +1,75 @@
+name: "GitHub Action - Nix Reclaim"
+description: "Reclaim Maximum Disk Space for Nix-Only Workflows in GitHub Actions"
+author: "Alix Brunet (Malix)"
+
+branding:
+  icon: trash-2
+  color: blue
+
+inputs:
+  remove-swap:
+    description: "Disable and delete Linux swapfile (frees +3-4 GB, with OOM risk on memory-heavy builds)."
+    default: "false"
+  async:
+    description: "Run deletion in background (0s upfront delay) instead of synchronously."
+    default: "false"
+  nix-permissions:
+    description: "Ensure /nix is created and owned by runner user (chown -R $(id -u):$(id -g) /nix)."
+    default: "true"
+  summary:
+    description: "Generate step summary report via Malix-Labs/GitHub-Action_Runner-Fetch."
+    default: "true"
+  monitor-disk:
+    description: "Track net disk consumption during reclaim via Runner-Fetch."
+    default: "true"
+  monitor-disk-io:
+    description: "Monitor disk I/O throughput during unlinking via Runner-Fetch."
+    default: "false"
+  export-prometheus:
+    description: "Generate Prometheus (.prom) metrics via Runner-Fetch."
+    default: "false"
+  sample-interval:
+    description: "Telemetry sampling interval in seconds."
+    default: "2"
+
+outputs:
+  initial-free-bytes:
+    description: "Free space before reclamation in bytes."
+    value: ${{ steps.reclaim.outputs.initial-free-bytes }}
+  final-free-bytes:
+    description: "Free space available for Nix in bytes."
+    value: ${{ steps.reclaim.outputs.final-free-bytes }}
+  reclaimed-bytes:
+    description: "Bytes freed by the action."
+    value: ${{ steps.reclaim.outputs.reclaimed-bytes }}
+
+runs:
+  using: composite
+  steps:
+    - name: Start Reclaim Phase Telemetry
+      if: inputs.summary == 'true' || inputs.monitor-disk-io == 'true'
+      uses: Malix-Labs/GitHub-Action_Runner-Fetch@v1.1.0
+      with:
+        phase-start: "Nix Reclaim"
+        scope-level: "1" # https://docs.github.com/en/actions/sharing-automations/creating-actions/creating-a-composite-action
+        monitor-disk: ${{ inputs.monitor-disk }}
+        monitor-disk-io: ${{ inputs.monitor-disk-io }}
+        export-prometheus: ${{ inputs.export-prometheus }}
+        sample-interval: ${{ inputs.sample-interval }}
+
+    - name: Execute Disk Reclaim
+      id: reclaim
+      shell: bash
+      run: |
+        "${{ github.action_path }}/src/reclaim.sh" \
+          --remove-swap "${{ inputs.remove-swap }}" \
+          --async "${{ inputs.async }}" \
+          --nix-permissions "${{ inputs.nix-permissions }}" \
+          --summary "${{ inputs.summary }}"
+
+    - name: End Reclaim Phase Telemetry & Report
+      if: inputs.summary == 'true' || inputs.monitor-disk-io == 'true'
+      uses: Malix-Labs/GitHub-Action_Runner-Fetch@v1.1.0
+      with:
+        phase-end: "Nix Reclaim"
+        scope-level: "1" # https://docs.github.com/en/actions/sharing-automations/creating-actions/creating-a-composite-action
