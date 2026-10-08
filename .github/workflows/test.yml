@@ -98,7 +98,8 @@ jobs:
       - name: Run nothing-but-nix (${{ matrix.strategy }})
         uses: wimpysworld/nothing-but-nix@main
         with:
-          strategy: ${{ matrix.strategy }}
+          hatchet-protocol: ${{ matrix.strategy }}
+          witness-carnage: "true"
       - name: End Benchmark Telemetry & Summary
         uses: Malix-Labs/GitHub-Action_Runner-Fetch@v1.1.0
         with:
