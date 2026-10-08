@@ -2,4 +2,4 @@
 
 GitHub Action to Reclaim Space for Nix
 
-**WIP**
+Work in progress.
