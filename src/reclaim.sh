@@ -4,6 +4,7 @@ set -eu
 REMOVE_SWAP="false"
 DRY_RUN="false"
 ASYNC="false"
+BTRFS_COMPRESS="0"
 SUMMARY="true"
 
 while [ "$#" -gt 0 ]; do
@@ -18,6 +19,10 @@ while [ "$#" -gt 0 ]; do
 		;;
 	--async)
 		ASYNC="${2:-false}"
+		shift 2
+		;;
+	--btrfs-compress)
+		BTRFS_COMPRESS="${2:-0}"
 		shift 2
 		;;
 	--summary)
@@ -57,6 +62,10 @@ Windows* | MINGW* | MSYS* | CYGWIN*)
 esac
 
 get_free_bytes() {
+	if [ -d "/nix" ] && mountpoint -q /nix 2>/dev/null; then
+		df -k -P /nix 2>/dev/null | awk 'NR==2 { printf "%.0f\n", $4 * 1024 }' || echo 0
+		return
+	fi
 	case "$TARGET_OS" in
 	macOS | Darwin)
 		if [ -d "/System/Volumes/Data" ]; then
@@ -166,6 +175,45 @@ if [ "$REMOVE_SWAP" = "true" ]; then
 		else
 			echo "Nix Reclaim [dry-run]: Would run swapoff -a and remove /swapfile /mnt/swapfile"
 		fi
+		;;
+	esac
+fi
+
+# Transparent Btrfs Compression for /nix (if requested)
+if [ "$BTRFS_COMPRESS" != "0" ] && [ "$BTRFS_COMPRESS" != "false" ]; then
+	case "$TARGET_OS" in
+	Linux*)
+		ZSTD_LEVEL="$BTRFS_COMPRESS"
+		[ "$ZSTD_LEVEL" = "true" ] && ZSTD_LEVEL="1"
+
+		echo "Nix Reclaim: Initializing transparent Btrfs ZSTD:${ZSTD_LEVEL} loop volume for /nix..."
+
+		if [ "$DRY_RUN" != "true" ]; then
+			if ! command -v mkfs.btrfs >/dev/null 2>&1; then
+				echo "Nix Reclaim: Installing btrfs-progs..."
+				_sudo apt-get update -qq >/dev/null 2>&1 || true
+				_sudo apt-get install -y -qq --no-install-recommends btrfs-progs >/dev/null 2>&1 || true
+			fi
+
+			# Calculate free space on / in megabytes, keeping 5GB safety headroom for OS
+			AVAIL_MB=$(df -BM / 2>/dev/null | awk 'NR==2 { gsub(/M/, "", $4); print $4 }')
+			IMG_SIZE_MB=$((AVAIL_MB - 5120))
+			if [ "$IMG_SIZE_MB" -lt 10240 ]; then
+				echo "::warning::Insufficient free space (${AVAIL_MB} MB) to provision Btrfs volume. Skipping compression."
+			else
+				IMG_PATH="/nix-store.img"
+				_sudo truncate -s "${IMG_SIZE_MB}M" "$IMG_PATH"
+				_sudo mkfs.btrfs -K -L nix "$IMG_PATH" >/dev/null 2>&1
+				_sudo mkdir -p /nix
+				_sudo mount -o "loop,compress=zstd:${ZSTD_LEVEL},noatime,space_cache=v2" "$IMG_PATH" /nix
+				echo "Nix Reclaim: Mounted ${IMG_SIZE_MB} MB Btrfs volume on /nix (compress=zstd:${ZSTD_LEVEL})."
+			fi
+		else
+			echo "Nix Reclaim [dry-run]: Would provision Btrfs loopback volume with compress=zstd:${ZSTD_LEVEL} on /nix"
+		fi
+		;;
+	*)
+		echo "::notice::btrfs-compress is only supported on Linux. Skipping on $TARGET_OS."
 		;;
 	esac
 fi

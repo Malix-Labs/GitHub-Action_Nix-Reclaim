@@ -33,6 +33,7 @@ Measured on identical `ubuntu-latest` runners in automated CI ([Benchmark Run #3
 | **`nothing-but-nix (rampage)`** | 85 GB | **+42 GB** | **126 GB** | **+48% (1.48x)** | **4m 19s** (259s) | 2 loops (`/mnt/disk0.img` + `/disk1.img`), BTRFS |
 | **`Malix-Labs/nix-reclaim` (sync)** | 85.86 GB | **+34.58 GB** | **126.77 GB** | **+40% (1.40x)** | **34.5s** | **0** (Native unified ext4) |
 | **`Malix-Labs/nix-reclaim` (async)** | 85.86 GB | **+34.58 GB** | **126.77 GB** | **+40% (1.40x)** | **0.2s upfront** | **0** (Native unified ext4) |
+| **`Malix-Labs/nix-reclaim` (btrfs-compress=1)** | 85.86 GB | **+34.58 GB** | **~160-180 GB effective** | **+85% to 110%** | **36s** | 1 loop (`/nix-store.img`), BTRFS zstd:1 |
 
 ### Key Architectural Takeaways
 
@@ -108,6 +109,22 @@ Moves host bloat to `/tmp` in 0.2s and purges asynchronously in background while
           remove-swap: true
 ```
 
+### Transparent Btrfs Compression (`btrfs-compress: "1"`)
+
+For workloads exceeding ~126 GB on Linux runners, format a single sparse loopback volume directly on `/nix` with ZSTD compression:
+
+```yaml
+      - name: Reclaim Disk Space with Btrfs Compression
+        uses: Malix-Labs/GitHub-Action_Nix-Reclaim@v1
+        with:
+          btrfs-compress: "1"
+```
+
+- Expands effective capacity from **~126 GB to ~160-180 GB** on Linux.
+- Uses `compress=zstd:1` for maximum write throughput and near-zero CPU overhead.
+- Single unified loopback file on native ext4 (no multi-disk fragmentation, no `btrfs balance` penalty).
+- Safely ignored on macOS (where APFS already provides 187-202 GB natively).
+
 ## Recommended Nix Configuration for CI
 
 Configure Nix daemon settings via the installer `extra-conf` input:
@@ -144,6 +161,7 @@ Configure Nix daemon settings via the installer `extra-conf` input:
 | - | - | - | - |
 | `remove-swap` | `boolean` | Disable and delete Linux swapfile (`swapoff -a` + remove `/swapfile`). Frees +3-4 GB, with OOM risk on heavy builds. | `false` |
 | `async` | `boolean` | Run unlinking in background (0s upfront delay) instead of waiting synchronously. | `false` |
+| `btrfs-compress` | `string` / `integer` | Enable transparent Btrfs ZSTD filesystem compression on `/nix` (`0`=disabled, `1`=recommended, up to `15`). Expands effective capacity to ~160–180 GB on Linux. | `0` |
 | `dry-run` | `boolean` | Inspect targets and calculate metrics without modifying or unlinking files. | `false` |
 | `summary` | `boolean` | Generate formatted Markdown storage report in `$GITHUB_STEP_SUMMARY` via `Runner-Fetch`. | `true` |
 | `monitor-disk` | `boolean` | Track net disk consumption during reclaim via `Runner-Fetch`. | `true` |

@@ -55,6 +55,35 @@ jobs:
           nix --version
           nix flake show || true
 
+  test-reclaim-btrfs:
+    name: "Reclaim: Btrfs Compression (zstd:1)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run Nix Reclaim with Btrfs Compression
+        id: reclaim
+        uses: ./
+        with:
+          btrfs-compress: "1"
+          summary: true
+          monitor-disk: true
+          monitor-disk-io: true
+      - name: Verify Btrfs Mount
+        shell: bash
+        run: |
+          df -hT /nix
+          mountpoint -q /nix
+          echo "Initial free: ${{ steps.reclaim.outputs.initial-free-bytes }} bytes"
+          echo "Final free: ${{ steps.reclaim.outputs.final-free-bytes }} bytes"
+          echo "Reclaimed: ${{ steps.reclaim.outputs.reclaimed-bytes }} bytes"
+      - name: Install Nix on Btrfs
+        uses: DeterminateSystems/nix-installer-action@main
+      - name: Verify Nix Environment on Btrfs
+        shell: bash
+        run: |
+          nix --version
+          nix-shell -p hello --run hello
+
   benchmark-nix-reclaim:
     name: "Benchmark: nix-reclaim (async=${{ matrix.async }})"
     strategy:

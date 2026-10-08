@@ -148,14 +148,25 @@ assert_match "Would run swapoff -a" "${TEST_TMP}/stdout" "Dry-run noted swap rem
 rm -rf "$TEST_TMP"
 
 # -----------------------------------------------------------------------------
-# Test 7: Action.yml structural validation
+# Test 7: Btrfs compression flag handling in dry-run mode
 # -----------------------------------------------------------------------------
-echo "[Test 7] action.yml structural verification"
+echo "[Test 7] Btrfs compression flag handling in dry-run mode"
+TEST_TMP=$(mktemp -d)
+sh "$RECLAIM_SH" --dry-run true --btrfs-compress 1 >"${TEST_TMP}/stdout" 2>&1
+assert_match "Initializing transparent Btrfs ZSTD:1 loop volume" "${TEST_TMP}/stdout" "Notice emitted for btrfs compression"
+assert_match "Would provision Btrfs loopback volume with compress=zstd:1" "${TEST_TMP}/stdout" "Dry-run noted btrfs mount without executing"
+rm -rf "$TEST_TMP"
+
+# -----------------------------------------------------------------------------
+# Test 8: Action.yml structural validation
+# -----------------------------------------------------------------------------
+echo "[Test 8] action.yml structural verification"
 ACTION_YML="${SCRIPT_DIR}/action.yml"
 assert_match 'name: "GitHub Action - Nix Reclaim"' "$ACTION_YML" "action.yml has valid name"
 assert_match "using: composite" "$ACTION_YML" "action.yml is composite action"
 assert_match "Malix-Labs/GitHub-Action_Runner-Fetch@v1.1.0" "$ACTION_YML" "action.yml pins Runner-Fetch@v1.1.0"
 assert_match 'scope-level: "1"' "$ACTION_YML" "action.yml configures scope-level 1"
+assert_match 'btrfs-compress:' "$ACTION_YML" "action.yml defines btrfs-compress input"
 
 echo "========================================"
 echo "Results: Total: $TOTAL, Failed: $FAILED"
