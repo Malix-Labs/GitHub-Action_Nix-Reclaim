@@ -16,9 +16,6 @@ inputs:
   async:
     description: "Run deletion in background (0s upfront delay) instead of synchronously."
     default: "false"
-  nix-permissions:
-    description: "Ensure /nix is created and owned by runner user (chown $(id -u):$(id -g) /nix)."
-    default: "true"
   summary:
     description: "Generate step summary report via Malix-Labs/GitHub-Action_Runner-Fetch."
     default: "true"
@@ -68,7 +65,6 @@ runs:
           --remove-swap "${{ inputs.remove-swap }}" \
           --dry-run "${{ inputs.dry-run }}" \
           --async "${{ inputs.async }}" \
-          --nix-permissions "${{ inputs.nix-permissions }}" \
           --summary "${{ inputs.summary }}"
 
     - name: End Reclaim Phase Telemetry & Report

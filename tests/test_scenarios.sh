@@ -96,7 +96,7 @@ CANDIDATES="${MOCK_DIR1}
 ${MOCK_DIR2}"
 
 RECLAIM_CANDIDATES_OVERRIDE="$CANDIDATES" \
-	sh "$RECLAIM_SH" --dry-run false --summary false --nix-permissions false >"${TEST_TMP}/stdout" 2>&1
+	sh "$RECLAIM_SH" --dry-run false --summary false >"${TEST_TMP}/stdout" 2>&1
 
 assert_file_not_exists "$MOCK_DIR1" "Mock directory 1 unlinked"
 assert_file_not_exists "$MOCK_DIR2" "Mock directory 2 unlinked"
@@ -112,7 +112,7 @@ mkdir -p "${MOCK_DIR3}/nested"
 echo "async payload" >"${MOCK_DIR3}/nested/data.bin"
 
 RECLAIM_CANDIDATES_OVERRIDE="$MOCK_DIR3" \
-	sh "$RECLAIM_SH" --async true --dry-run false --summary false --nix-permissions false >"${TEST_TMP}/stdout" 2>&1
+	sh "$RECLAIM_SH" --async true --dry-run false --summary false >"${TEST_TMP}/stdout" 2>&1
 
 # In async mode, the original path is unlinked/moved immediately
 assert_file_not_exists "$MOCK_DIR3" "Mock directory 3 unlinked immediately in async mode"

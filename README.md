@@ -145,7 +145,6 @@ Configure Nix daemon settings via the installer `extra-conf` input:
 | `remove-swap` | `boolean` | Disable and delete Linux swapfile (`swapoff -a` + remove `/swapfile`). Frees +3-4 GB, with OOM risk on heavy builds. | `false` |
 | `async` | `boolean` | Run unlinking in background (0s upfront delay) instead of waiting synchronously. | `false` |
 | `dry-run` | `boolean` | Inspect targets and calculate metrics without modifying or unlinking files. | `false` |
-| `nix-permissions` | `boolean` | Create `/nix` with proper ownership (`$(id -u):$(id -g)`) and configure `TMPDIR=/nix/tmp`. | `true` |
 | `summary` | `boolean` | Generate formatted Markdown storage report in `$GITHUB_STEP_SUMMARY` via `Runner-Fetch`. | `true` |
 | `monitor-disk` | `boolean` | Track net disk consumption during reclaim via `Runner-Fetch`. | `true` |
 | `monitor-disk-io` | `boolean` | Track disk I/O throughput (Read/Write MB) during deletion via `Runner-Fetch`. | `false` |

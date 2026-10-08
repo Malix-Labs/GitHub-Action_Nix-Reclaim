@@ -4,7 +4,6 @@ set -eu
 REMOVE_SWAP="false"
 DRY_RUN="false"
 ASYNC="false"
-NIX_PERMISSIONS="true"
 SUMMARY="true"
 
 while [ "$#" -gt 0 ]; do
@@ -19,10 +18,6 @@ while [ "$#" -gt 0 ]; do
 		;;
 	--async)
 		ASYNC="${2:-false}"
-		shift 2
-		;;
-	--nix-permissions)
-		NIX_PERMISSIONS="${2:-true}"
 		shift 2
 		;;
 	--summary)
@@ -173,22 +168,6 @@ if [ "$REMOVE_SWAP" = "true" ]; then
 		fi
 		;;
 	esac
-fi
-
-# Ensure /nix directory setup and permissions
-if [ "$NIX_PERMISSIONS" = "true" ]; then
-	if [ "$DRY_RUN" != "true" ]; then
-		_sudo mkdir -p /nix 2>/dev/null || true
-		_sudo chown "$(id -u):$(id -g)" /nix 2>/dev/null || true
-		_sudo chmod 0755 /nix 2>/dev/null || true
-		_sudo mkdir -p /nix/tmp 2>/dev/null || true
-		_sudo chmod 1777 /nix/tmp 2>/dev/null || true
-		if [ -n "${GITHUB_ENV:-}" ]; then
-			echo "TMPDIR=/nix/tmp" >>"$GITHUB_ENV"
-		fi
-	else
-		echo "Nix Reclaim [dry-run]: Would initialize /nix (0755) and /nix/tmp (1777)"
-	fi
 fi
 
 FINAL_FREE_BYTES=$(get_free_bytes)
