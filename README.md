@@ -1,9 +1,5 @@
 # GitHub Action - Nix Reclaim
 
-[![Checks](https://github.com/Malix-Labs/GitHub-Action_Nix-Reclaim/actions/workflows/check.yml/badge.svg)](https://github.com/Malix-Labs/GitHub-Action_Nix-Reclaim/actions/workflows/check.yml)
-[![Test Nix Reclaim](https://github.com/Malix-Labs/GitHub-Action_Nix-Reclaim/actions/workflows/test.yml/badge.svg)](https://github.com/Malix-Labs/GitHub-Action_Nix-Reclaim/actions/workflows/test.yml)
-[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE.md)
-
 Fast, zero-overhead disk space reclamation for pure Nix workflows in GitHub Actions runners (Linux and macOS).
 
 Reclaims **~43 GB** on Linux runners (reaching **~71 GB** free) and **~246 GB** on macOS runners (reaching **~284 GB** free) in **~2-4 seconds** by eradicating pre-installed host bloat in parallel across available CPU cores.
@@ -126,25 +122,25 @@ To enable swap removal for storage-limited builds:
 
 ## Inputs
 
-| Input | Description | Default |
-| :--- | :--- | :--- |
-| `remove-swap` | Disable and delete the Linux swapfile (`swapoff -a` + remove `/swapfile`). Frees +3-4 GB, but introduces Out-Of-Memory risk on heavy builds. | `false` |
-| `async` | Run unlinking in the background (0s upfront delay) instead of synchronously waiting for deletion to complete. | `false` |
-| `dry-run` | Inspect targets and calculate metrics without modifying or unlinking files. | `false` |
-| `nix-permissions` | Create `/nix` with proper ownership (`$(id -u):$(id -g)`) and configure `TMPDIR=/nix/tmp`. | `true` |
-| `summary` | Generate a formatted Markdown storage report in `$GITHUB_STEP_SUMMARY` via `Runner-Fetch`. | `true` |
-| `monitor-disk` | Track net disk consumption during reclaim via `Runner-Fetch`. | `true` |
-| `monitor-disk-io` | Track disk I/O throughput (Read/Write MB) during deletion via `Runner-Fetch`. | `false` |
-| `export-prometheus` | Export OpenMetrics (`metrics.prom`) telemetry via `Runner-Fetch`. | `false` |
-| `sample-interval` | Telemetry sampling interval in seconds. | `2` |
+| Input | Type | Description | Default |
+| :--- | :--- | :--- | :--- |
+| `remove-swap` | `boolean` | Disable and delete the Linux swapfile (`swapoff -a` + remove `/swapfile`). Frees +3-4 GB, but introduces Out-Of-Memory risk on heavy builds. | `false` |
+| `async` | `boolean` | Run unlinking in the background (0s upfront delay) instead of synchronously waiting for deletion to complete. | `false` |
+| `dry-run` | `boolean` | Inspect targets and calculate metrics without modifying or unlinking files. | `false` |
+| `nix-permissions` | `boolean` | Create `/nix` with proper ownership (`$(id -u):$(id -g)`) and configure `TMPDIR=/nix/tmp`. | `true` |
+| `summary` | `boolean` | Generate a formatted Markdown storage report in `$GITHUB_STEP_SUMMARY` via `Runner-Fetch`. | `true` |
+| `monitor-disk` | `boolean` | Track net disk consumption during reclaim via `Runner-Fetch`. | `true` |
+| `monitor-disk-io` | `boolean` | Track disk I/O throughput (Read/Write MB) during deletion via `Runner-Fetch`. | `false` |
+| `export-prometheus` | `boolean` | Export OpenMetrics (`metrics.prom`) telemetry via `Runner-Fetch`. | `false` |
+| `sample-interval` | `integer` | Telemetry sampling interval in seconds. | `2` |
 
 ## Outputs
 
-| Output | Description | Example |
-| :--- | :--- | :--- |
-| `initial-free-bytes` | Free space before reclamation in bytes. | `30064771072` |
-| `final-free-bytes` | Free space available for Nix in bytes. | `76241895424` |
-| `reclaimed-bytes` | Exact number of bytes freed by the action. | `46177124352` |
+| Output | Type | Description | Example |
+| :--- | :--- | :--- | :--- |
+| `initial-free-bytes` | `integer` | Free space before reclamation in bytes. | `30064771072` |
+| `final-free-bytes` | `integer` | Free space available for Nix in bytes. | `76241895424` |
+| `reclaimed-bytes` | `integer` | Exact number of bytes freed by the action. | `46177124352` |
 
 ## Purged Bloat Catalog
 
@@ -169,7 +165,3 @@ To enable swap removal for storage-limited builds:
 - `/opt/homebrew` & `/usr/local/Homebrew` (Homebrew package manager trees and caches)
 - `/usr/local/share/dotnet` (.NET runtimes)
 - `/Users/runner/Library/Caches` & `/Library/Caches` (System and user build caches)
-
-## License
-
-This project is licensed under the [GNU General Public License v3.0](LICENSE.md).
