@@ -74,7 +74,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Reclaim Disk Space for Nix
-        uses: Malix-Labs/GitHub-Action_Nix-Reclaim@v1
+        uses: Malix-Labs/GitHub-Action_Nix-Reclaim@v2.0.0
         with:
           summary: true
 
@@ -93,7 +93,7 @@ Moves host bloat to `/tmp` in 0.2s and purges asynchronously in background while
 
 ```yaml
       - name: Reclaim Disk Space (Background Mode)
-        uses: Malix-Labs/GitHub-Action_Nix-Reclaim@v1
+        uses: Malix-Labs/GitHub-Action_Nix-Reclaim@v2.0.0
         with:
           async: true
 ```
@@ -105,7 +105,7 @@ Moves host bloat to `/tmp` in 0.2s and purges asynchronously in background while
 
 ```yaml
       - name: Reclaim Maximum Space (With Swap Removal)
-        uses: Malix-Labs/GitHub-Action_Nix-Reclaim@v1
+        uses: Malix-Labs/GitHub-Action_Nix-Reclaim@v2.0.0
         with:
           remove-swap: true
 ```
@@ -116,7 +116,7 @@ For workloads exceeding ~126 GB on Linux runners, format a single sparse loopbac
 
 ```yaml
       - name: Reclaim Disk Space with Btrfs Compression
-        uses: Malix-Labs/GitHub-Action_Nix-Reclaim@v1
+        uses: Malix-Labs/GitHub-Action_Nix-Reclaim@v2.0.0
         with:
           btrfs-compress: "1"
 ```
