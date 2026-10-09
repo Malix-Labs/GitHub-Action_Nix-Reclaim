@@ -45,6 +45,13 @@ _sudo() {
 	fi
 }
 
+_unlink() {
+	target="$1"
+	[ -e "$target" ] || [ -L "$target" ] || return 0
+	# find -delete streams directory unlinking depth-first without buffering inodes in user-space
+	_sudo find "$target" -delete 2>/dev/null || _sudo rm -rf "$target" >/dev/null 2>&1 || true
+}
+
 TARGET_OS="${RUNNER_OS:-$(uname -s 2>/dev/null || echo 'Linux')}"
 
 case "$TARGET_OS" in
@@ -149,16 +156,16 @@ if [ -n "$EXISTING" ]; then
 	elif [ "$ASYNC" = "true" ]; then
 		TRASH_DIR=$(mktemp -d /tmp/.reclaim-trash.XXXXXX 2>/dev/null || mktemp -d -t .reclaim-trash)
 		echo "Nix Reclaim: Moving host bloat to staging directory ${TRASH_DIR} for background unlinking..."
-		echo "$EXISTING" | while IFS= read -r p; do
+		for p in $EXISTING; do
 			[ -z "$p" ] && continue
-			_sudo mv "$p" "$TRASH_DIR/" 2>/dev/null || _sudo rm -rf "$p" >/dev/null 2>&1 || true
+			_sudo mv "$p" "$TRASH_DIR/" 2>/dev/null || _unlink "$p"
 		done
-		(_sudo rm -rf "$TRASH_DIR" >/dev/null 2>&1 &)
+		(_unlink "$TRASH_DIR" &)
 	else
 		echo "Nix Reclaim: Purging host bloat in parallel across available CPU cores..."
 		for p in $EXISTING; do
 			[ -z "$p" ] && continue
-			_sudo rm -rf "$p" >/dev/null 2>&1 &
+			_unlink "$p" &
 		done
 		wait
 	fi
