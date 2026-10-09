@@ -40,6 +40,7 @@ Measured on identical `ubuntu-latest` runners in automated CI ([Benchmark Run #3
 - **No false zero-space purges**: `holster` and `carve` purge 0 bytes and choke `/` down to 1 GB free (100% full) by carving unpurged space into a loopback image.
 - **No multi-disk fragmentation**: `cleave` and `rampage` fragment storage into two loopback files (`/mnt/disk0.img` and `/disk1.img`) joined by BTRFS balancing, causing compile-time I/O thrashing.
 - **No 4-minute package manager slowdown**: `rampage` spends 4m 19s in sequential `apt-get` purges, while `nix-reclaim` delivers the same ~126 GB capacity in 34.5s (or 0.2s async) via parallel unlinking on native ext4.
+- **No external binary overhead (`rmz`)**: `nothing-but-nix` downloads and runs third-party `rmz`, incurring external network download latency and severe thread lock contention on cloud ext4 filesystems (taking ~138s in live runner benchmarks), whereas `nix-reclaim` uses zero external dependencies with kernel-native unlinking.
 
 ## macOS Runner Storage Reclaimed
 
