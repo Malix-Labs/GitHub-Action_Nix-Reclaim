@@ -12,18 +12,18 @@ In a hermetic Nix workflow, every dependency, compiler, runtime, and toolchain i
 
 | Feature / Metric | `jlumbroso/free-disk-space` | `easimon/maximize-build-space` | `wimpysworld/nothing-but-nix` | **`Malix-Labs/nix-reclaim`** |
 | - | - | - | - | - |
-| **Purge Mechanism** | `apt-get remove` & package cleanup | `apt-get` + unlinking + swap resize | Loopback file + BTRFS zstd mount | **Direct parallel unlinking (`rm -rf`)** |
+| **Purge Mechanism** | `apt-get remove` & package cleanup | `apt-get` + unlinking + swap resize | Loopback file + BTRFS zstd mount | **Kernel depth-first unlinking (`find -delete` / `rm -rf`)** |
 | **Execution Delay** | 3-6 minutes | 2-5 minutes | 15-45 seconds | **~2-4 seconds (0s with `async: true`)** |
 | **Filesystem Strategy** | Native ext4 | LVM / swap resizing | BTRFS on ext4 loop device | **Native host filesystem (ext4 / APFS)** |
 | **Compilation Overhead** | None | None | **Severe** (BTRFS balance I/O thrashing) | **Zero** (no loop devices, no daemons) |
 | **Runner Architecture** | Split `/mnt` and `/` assumptions | Split `/mnt` and `/` assumptions | Obsolete `/mnt` pooling | **Unified partition native (`sda1`)** |
-| **macOS Support** | None | None | None | **Full (frees ~246 GB Xcode / SDKs)** |
+| **macOS Support** | None | None | None | **Apple Silicon (frees ~100-146 GB)** |
 | **Swap Safety** | Blind removal / resize | Blind removal | Custom loop swap | **Explicit (`remove-swap: false` default)** |
 | **Telemetry & Reporting** | Primitive text logs | Primitive text logs | Custom shell logs | **Integrated `Runner-Fetch` summary & metrics** |
 
 ## Benchmark Comparison with `nothing-but-nix` (All Protocol Levels)
 
-Measured on identical `ubuntu-latest` runners in automated CI ([Benchmark Run #37839008936](https://github.com/Malix-Labs/GitHub-Action_Nix-Reclaim/actions/runs/37839008936)) using [Runner-Fetch](https://github.com/Malix-Labs/GitHub-Action_Runner-Fetch) phase profiling:
+Measured on identical `ubuntu-latest` runners in automated CI ([Benchmark Run #37908676740](https://github.com/Malix-Labs/GitHub-Action_Nix-Reclaim/actions/runs/37908676740)) using [Runner-Fetch](https://github.com/Malix-Labs/GitHub-Action_Runner-Fetch) phase profiling:
 
 | Action & Strategy Level | Initial Free Space | Reclaimed Space | Final Available Space | Free Space Increase | Phase Execution Time | Loop Devices & Filesystem |
 | - | - | - | - | - | - | - |
@@ -44,7 +44,7 @@ Measured on identical `ubuntu-latest` runners in automated CI ([Benchmark Run #3
 
 ## macOS Runner Storage Reclaimed
 
-Xcode, simulators, and mobile SDKs consume ~70% of standard macOS runner disks. `nothing-but-nix` cannot run on macOS. `nix-reclaim` purges this bloat directly on APFS:
+Xcode, simulators, and mobile SDKs consume ~70% of standard macOS runner disks. `nothing-but-nix` cannot run on macOS. `nix-reclaim` purges this bloat directly on APFS for Apple Silicon runners (`aarch64-darwin`):
 
 | Runner Platform | Initial Free Space | Reclaimed Space | Final Available Space | Free Space Increase | Status |
 | - | - | - | - | - | - |
@@ -57,7 +57,7 @@ Xcode, simulators, and mobile SDKs consume ~70% of standard macOS runner disks. 
 
 Automated CI runs benchmark `nix-reclaim` against every level of `nothing-but-nix` on weekly runner updates:
 
-- **[View Latest Benchmark Run #37839008936](https://github.com/Malix-Labs/GitHub-Action_Nix-Reclaim/actions/runs/37839008936)** (full telemetry summaries and logs)
+- **[View Latest Benchmark Run #37908676740](https://github.com/Malix-Labs/GitHub-Action_Nix-Reclaim/actions/runs/37908676740)** (full telemetry summaries and logs)
 - **[View All CI Test & Benchmark Runs](https://github.com/Malix-Labs/GitHub-Action_Nix-Reclaim/actions/workflows/test.yml)** (dynamic workflow link)
 
 ## Usage
@@ -192,12 +192,12 @@ Configure Nix daemon settings via the installer `extra-conf` input:
 - `/opt/google/chrome` & `/opt/microsoft/msedge` & `/usr/lib/firefox` (Browsers and drivers)
 - `/usr/share/man` & `/usr/share/doc` (Manpages and system documentation)
 
-### macOS Runners (`Darwin`)
+### macOS Runners (Apple Silicon / `Darwin`)
 
 - `/Applications/Xcode*.app` (All multi-gigabyte Xcode bundles)
 - `/Library/Developer/CoreSimulator` (Simulator runtimes)
 - `/Users/runner/Library/Android` (Android SDK and build tools)
 - `/Users/runner/hostedtoolcache` (Toolcache runtimes)
-- `/opt/homebrew` & `/usr/local/Homebrew` (Homebrew package manager trees and caches)
+- `/opt/homebrew` (Homebrew package manager trees and caches)
 - `/usr/local/share/dotnet` (.NET runtimes)
 - `/Users/runner/Library/Caches` & `/Library/Caches` (System and user build caches)

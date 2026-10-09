@@ -45,13 +45,6 @@ _sudo() {
 	fi
 }
 
-_unlink() {
-	target="$1"
-	[ -e "$target" ] || [ -L "$target" ] || return 0
-	# find -delete streams directory unlinking depth-first without buffering inodes in user-space
-	_sudo find "$target" -delete 2>/dev/null || _sudo rm -rf "$target" >/dev/null 2>&1 || true
-}
-
 TARGET_OS="${RUNNER_OS:-$(uname -s 2>/dev/null || echo 'Linux')}"
 
 case "$TARGET_OS" in
@@ -67,6 +60,21 @@ Windows* | MINGW* | MSYS* | CYGWIN*)
 	exit 0
 	;;
 esac
+
+_unlink() {
+	target="$1"
+	[ -e "$target" ] || [ -L "$target" ] || return 0
+	case "$TARGET_OS" in
+	macOS* | Darwin*)
+		# APFS directory trees delete faster using rm -rf; BSD find -delete is single-threaded
+		_sudo rm -rf "$target" >/dev/null 2>&1 || true
+		;;
+	*)
+		# find -delete streams directory unlinking depth-first without buffering inodes in user-space
+		_sudo find "$target" -delete 2>/dev/null || _sudo rm -rf "$target" >/dev/null 2>&1 || true
+		;;
+	esac
+}
 
 get_free_bytes() {
 	if [ -d "/nix" ] && mountpoint -q /nix 2>/dev/null; then
@@ -114,7 +122,6 @@ else
 /Users/runner/Library/Android
 /Users/runner/hostedtoolcache
 /opt/homebrew
-/usr/local/Homebrew
 /usr/local/share/dotnet
 /Users/runner/Library/Caches
 /Library/Caches"

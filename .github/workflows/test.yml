@@ -26,9 +26,7 @@ jobs:
           - ubuntu-slim
           - macos-latest
           - macos-26
-          - macos-26-intel
           - macos-15
-          - macos-15-intel
           - macos-14
     runs-on: ${{ matrix.os }}
     steps:
