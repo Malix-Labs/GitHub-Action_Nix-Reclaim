@@ -44,11 +44,9 @@
               ];
               settings.configuration = {
                 MD013 = false;
-                MD026 = false;
-                MD034 = false;
-                MD041 = false;
-                MD012 = false;
-                MD036 = false;
+                MD024 = {
+                  siblings_only = true;
+                };
               };
             };
           };
