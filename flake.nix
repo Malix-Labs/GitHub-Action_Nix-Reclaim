@@ -51,43 +51,6 @@
             };
           };
 
-          formatter =
-            let
-              cfg = config.pre-commit.settings;
-            in
-            pkgs.writeShellScriptBin "pre-commit-fmt" ''
-              set -euo pipefail
-              export PATH="${
-                pkgs.lib.makeBinPath (
-                  [
-                    cfg.gitPackage
-                    cfg.package
-                  ]
-                  ++ cfg.enabledPackages
-                )
-              }:$PATH"
-
-              exitcode=0
-              if [ "$#" -gt 0 ]; then
-                ${pkgs.lib.getExe cfg.package} run -c ${cfg.configFile} --files "$@" || exitcode=$?
-              else
-                if [ -n "''${PRJ_ROOT:-}" ]; then
-                  cd "$PRJ_ROOT"
-                fi
-                ${pkgs.lib.getExe cfg.package} run -c ${cfg.configFile} --all-files || exitcode=$?
-              fi
-
-              if [ "$exitcode" -eq 1 ]; then
-                if [ "$#" -gt 0 ]; then
-                  ${pkgs.lib.getExe cfg.package} run -c ${cfg.configFile} --files "$@"
-                else
-                  ${pkgs.lib.getExe cfg.package} run -c ${cfg.configFile} --all-files
-                fi
-              else
-                exit "$exitcode"
-              fi
-            '';
-
           packages.test-runner = pkgs.writeShellApplication {
             name = "test-runner";
             runtimeInputs = [ pkgs.gh ];
